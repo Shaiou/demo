@@ -8,4 +8,3 @@ trusted_networks= "109.28.19.33/32"
 
 bastion_ami     = "ami-e31a6594"
 bastion_type    = "t2.nano"
-key_name        = "aws-dev"

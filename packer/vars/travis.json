@@ -1,10 +1,10 @@
 {
-    "source_ami": "ami-e31a6594",
-    "region": "eu-west-1",
-    "build_vpc": "vpc-6a44b50f",
-    "build_subnet": "subnet-6f607c29",
-    "build_sg": "",
-    "ssh_private"   : "false",
-    "public_ip"     : "true",
-    "project" : "demotv"
+    "source_ami"   : "ami-e31a6594",
+    "region"       : "eu-west-1",
+    "build_vpc"    : "vpc-8fd2ceed",
+    "build_subnet" : "subnet-a83437dc",
+    "build_sg"     : "",
+    "ssh_private"  : "false",
+    "public_ip"    : "true",
+    "project"      : "demotv"
 }

@@ -1,27 +1,29 @@
 terraform {
-    backend "s3" {
-        bucket = "tfstates"
-        key    = "demo/frontends"
-        region = "eu-west-1"
-    }
+  backend "s3" {
+    bucket = "shaiou-tfstates"
+    key    = "demo/frontends"
+    region = "eu-west-1"
+  }
 }
 
 data "terraform_remote_state" "vpc" {
-    backend = "s3"
-    config {
-        bucket = "tfstates"
-        key    = "demo/vpc"
-        region = "eu-west-1"
-    }
+  backend = "s3"
+
+  config {
+    bucket = "shaiou-tfstates"
+    key    = "demo/vpc"
+    region = "eu-west-1"
+  }
 }
 
 data "terraform_remote_state" "backends" {
-    backend = "s3"
-    config {
-        bucket = "tfstates"
-        key    = "demo/backends"
-        region = "eu-west-1"
-    }
+  backend = "s3"
+
+  config {
+    bucket = "shaiou-tfstates"
+    key    = "demo/backends"
+    region = "eu-west-1"
+  }
 }
 
 provider "aws" {
@@ -29,74 +31,105 @@ provider "aws" {
 }
 
 resource "aws_elb" "web" {
-    name = "web${var.frontend_name}"
-    subnets = ["${split(",",data.terraform_remote_state.vpc.public_subnets)}"]
-    security_groups = ["${data.terraform_remote_state.backends.sg_elb}"]
-    cross_zone_load_balancing = "true"
-    internal = "false"
-    listener {
-        instance_port = "80"
-        instance_protocol = "http"
-        lb_port = "80"
-        lb_protocol = "http"
-    }
-    health_check {
-        healthy_threshold = "2"
-        unhealthy_threshold = "2"
-        timeout = "2"
-        target = "HTTP:80${var.health_check_path}"
-        interval = "5"
-    }
-    tags { Name = "web-${var.frontend_name}" }
+  name                      = "web${var.frontend_name}"
+  subnets                   = ["${split(",",data.terraform_remote_state.vpc.public_subnets)}"]
+  security_groups           = ["${data.terraform_remote_state.backends.sg_elb}"]
+  cross_zone_load_balancing = "true"
+  internal                  = "false"
+
+  listener {
+    instance_port     = "80"
+    instance_protocol = "http"
+    lb_port           = "80"
+    lb_protocol       = "http"
+  }
+
+  health_check {
+    healthy_threshold   = "2"
+    unhealthy_threshold = "2"
+    timeout             = "2"
+    target              = "HTTP:80${var.health_check_path}"
+    interval            = "5"
+  }
+
+  tags {
+    Name = "web-${var.frontend_name}"
+  }
 }
 
 data "template_file" "user_data" {
-    template = "${file("user_data.tpl")}"
-    vars {
-         backend_properties = "${data.terraform_remote_state.backends.properties}"
-         properties = "${var.properties}"
-    }
+  template = "${file("user_data.tpl")}"
+
+  vars {
+    backend_properties = "${data.terraform_remote_state.backends.properties}"
+    properties         = "${var.properties}"
+  }
 }
 
 resource "aws_launch_configuration" "web" {
-    image_id = "${var.web_ami}"
-    name_prefix = "lc-web-${var.frontend_name}-"
-    instance_type = "${var.web_instance_type}"
-    key_name = "${var.key_name}"
-    security_groups = ["${data.terraform_remote_state.backends.sg_web}",
-                       "${data.terraform_remote_state.vpc.sg_sshserver}"]
-    user_data="${data.template_file.user_data.rendered}"
-    iam_instance_profile = "${data.terraform_remote_state.backends.web_profile}"
-    lifecycle { create_before_destroy = true }
+  image_id      = "${var.web_ami}"
+  name_prefix   = "lc-web-${var.frontend_name}-"
+  instance_type = "${var.web_instance_type}"
+  key_name      = "${var.key_name}"
+
+  security_groups = ["${data.terraform_remote_state.backends.sg_web}"]
+
+  user_data            = "${data.template_file.user_data.rendered}"
+  iam_instance_profile = "${data.terraform_remote_state.backends.web_profile}"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_autoscaling_group" "web_asg" {
-    name = "asg-${aws_launch_configuration.web.name}"
-    launch_configuration = "${aws_launch_configuration.web.id}"
-    availability_zones = ["${split(",",data.terraform_remote_state.vpc.azs)}"]
-    vpc_zone_identifier = ["${split(",",data.terraform_remote_state.vpc.private_subnets)}"]
-    load_balancers = ["${aws_elb.web.name}"]
-    health_check_type = "${var.health_check_type}"
-    health_check_grace_period = "${var.health_check_grace_period}"
-    tag { key = "Name" value = "Web-${var.frontend_name}" propagate_at_launch = "true" }
-    tag { key = "Commit" value = "${var.commit}" propagate_at_launch = "true" }
-    min_size = "${var.asg_min}"
-    min_elb_capacity = "${var.asg_min}"
-    max_size = "${var.asg_max}"
-    desired_capacity = "${var.asg_desired}"
-    lifecycle { create_before_destroy = true }
+  name                      = "asg-${aws_launch_configuration.web.name}"
+  launch_configuration      = "${aws_launch_configuration.web.id}"
+  availability_zones        = ["${split(",",data.terraform_remote_state.vpc.azs)}"]
+  vpc_zone_identifier       = ["${split(",",data.terraform_remote_state.vpc.private_subnets)}"]
+  load_balancers            = ["${aws_elb.web.name}"]
+  health_check_type         = "${var.health_check_type}"
+  health_check_grace_period = "${var.health_check_grace_period}"
+
+  tag {
+    key = "Name"
+
+    value = "Web-${var.frontend_name}"
+
+    propagate_at_launch = "true"
+  }
+
+  tag {
+    key = "Commit"
+
+    value = "${var.commit}"
+
+    propagate_at_launch = "true"
+  }
+
+  min_size         = "${var.asg_min}"
+  min_elb_capacity = "${var.asg_min}"
+  max_size         = "${var.asg_max}"
+  desired_capacity = "${var.asg_desired}"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "web" {
-    count = "${var.route53_zoneid == "" ? 0: 1}"
-    zone_id = "${var.route53_zoneid}"
-    name = "${var.dns_alias}"
-    type = "A"
-    alias {
-        name = "${aws_elb.web.dns_name}"
-        zone_id = "${aws_elb.web.zone_id}"
-        evaluate_target_health = "false"
-    }
+  count   = "${var.route53_zoneid == "" ? 0: 1}"
+  zone_id = "${var.route53_zoneid}"
+  name    = "${var.dns_alias}"
+  type    = "A"
+
+  alias {
+    name                   = "${aws_elb.web.dns_name}"
+    zone_id                = "${aws_elb.web.zone_id}"
+    evaluate_target_health = "false"
+  }
 }
 
-output "elb" { value = "${aws_elb.web.dns_name}" }
+output "elb" {
+  value = "${aws_elb.web.dns_name}"
+}

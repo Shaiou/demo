@@ -1,7 +1,10 @@
 variable "region" {}
 
 variable "frontend_name" {}
-variable "commit" {default = "unknwon"}
+
+variable "commit" {
+  default = "unknwon"
+}
 
 variable "web_ami" {}
 variable "web_instance_type" {}
@@ -16,5 +19,10 @@ variable "asg_max" {}
 variable "asg_min" {}
 variable "health_check_grace_period" {}
 
-variable "route53_zoneid" { default= ""}
-variable "dns_alias" { default = ""}
+variable "route53_zoneid" {
+  default = ""
+}
+
+variable "dns_alias" {
+  default = ""
+}
