@@ -86,7 +86,7 @@ resource "aws_autoscaling_group" "web_asg" {
   name                      = "asg-${aws_launch_configuration.web.name}"
   launch_configuration      = "${aws_launch_configuration.web.id}"
   availability_zones        = ["${split(",",data.terraform_remote_state.vpc.azs)}"]
-  vpc_zone_identifier       = ["${split(",",data.terraform_remote_state.vpc.private_subnets)}"]
+  vpc_zone_identifier       = ["${split(",",data.terraform_remote_state.vpc.public_subnets)}"]
   load_balancers            = ["${aws_elb.web.name}"]
   health_check_type         = "${var.health_check_type}"
   health_check_grace_period = "${var.health_check_grace_period}"
@@ -132,4 +132,8 @@ resource "aws_route53_record" "web" {
 
 output "elb" {
   value = "${aws_elb.web.dns_name}"
+}
+
+output "url" {
+  value = "${aws_route53_record.web.fqdn}"
 }
